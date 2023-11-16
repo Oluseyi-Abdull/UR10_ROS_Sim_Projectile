@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+
+#---------------Import Libraries and msgs---------------:
+
+import rospy
+import time
+import math
+import numpy as np
+from std_msgs.msg import *
+from geometry_msgs.msg import *
+import tf2_msgs.msg
+from tf.transformations import euler_from_quaternion
+from control_lib import UR_Controller
+
+#---------------Initialise---------------:
+
+print("Please Wait While System Starts Up...")
+rospy.init_node("move_j_example", anonymous=False)
+# play = rospy.Publisher('/trajectory_generator/play', String, queue_size=10)
+ur_script = rospy.Publisher('/ur_hardware_interface/script_command', String, queue_size=10)
+ur_con = UR_Controller()
+time.sleep(2)
+print("System Started")
+
+
+#---------------Define Variables---------------:
+
+#Move J's are faster, since precision isn't the goal
+max_acc = 1.0
+max_vel = 1.0
+header = "def myProg():"
+footer = "\nend"
+
+#Create points for Move J's by converting joint angles into rads
+waypoint1 = [-0.29635690698863715, -1.7847736930894016, -1.4852751934471744, -1.4051645807806348, 1.577428577952475, -1.8694221618111264]
+waypoint2 = [0.13351768777756623, -1.4756758825612055, -1.7125170620568362, -1.4864969239235706, 1.5482815794441696, -1.4395475670449231]
+waypoint3 = [0.72640603468004, -1.4236650708517744, -1.560847950058529, -1.7058848108992577, 1.5320500174006224, -0.8459610884416515]
+home_waypoint = [-1.58825, -1.71042, -2.19911, -0.802851, 1.58825, -0.03106686]
+
+#Add them to ordered list to move to them one by one
+waypoints = [waypoint1, waypoint2, waypoint3]
+
+def home_robot():
+	header = "def myProg():"
+	footer = "\nend"
+	home_waypoint = [-1.58825, -1.71042, -2.19911, -0.802851, 1.58825, -0.03106686]
+	move_msg ="\nmovej({},a={},v={},t={},r={})".format(home_waypoint, max_acc ,max_vel,0,0)
+	command = header + move_msg + footer
+	return command
+
+def move_j_pose(pose):
+	header = "def myProg():"
+	footer = "\nend"
+	x = pose.position.x
+	y = pose.position.y
+	z = pose.position.z
+	rx, ry, rz = UR_Controller().convert_to_euler(pose.orientation)
+	pose_str = '['+str(x)+ ',' +str(y)+ ',' +str(z)+ ',' +str(rx)+ ',' +str(ry)+ ',' +str(rz) +']'
+	command = header + '\n\tmovej(p{}, a={}, v={}, t=0, r=0)'.format(pose_str, max_acc, max_vel) + footer
+	return command
+
+
+#---------------Main Code---------------:
+
+## Move using local function and waypoint
+command = home_robot()
+ur_script.publish(command)
+
+## Move using local function and pose
+my_pos = ur_con.get_pose()
+my_pos.position.x += 0.3
+command = move_j_pose(my_pos)
+ur_script.publish(command)
+
+my_pos = ur_con.get_pose()
+my_pos.position.y -= 0.3
+command = move_j_pose(my_pos)
+ur_script.publish(command)
+
+my_pos = ur_con.get_pose()
+my_pos.position.z += 0.3
+command = move_j_pose(my_pos)
+ur_script.publish(command)
+
+## Move using lib and waypoint
+command = ur_con.generate_move_j(home_waypoint)
+ur_script.publish(command)
+
+## Move using lib and waypoint sequence
+command = ur_con.generate_move_j(waypoints, sequence=True)
+ur_script.publish(command)
+
+## Move using lib and pose
+my_pos = ur_con.get_pose()
+my_pos.position.x += 0.3
+command = ur_con.generate_move_j(my_pos, pose_msg=True)
+ur_script.publish(command)

@@ -1,0 +1,35 @@
+#!/usr/bin/env python3
+
+#---------------Import Libraries and msgs---------------:
+
+import rospy
+import time
+import math
+import numpy as np
+from std_msgs.msg import *
+from geometry_msgs.msg import *
+import tf2_msgs.msg
+from tf.transformations import euler_from_quaternion
+from collections import Counter
+from control_lib import UR_Controller
+
+
+#---------------Initialise---------------:
+
+print("Please Wait While System Starts Up...")
+rospy.init_node("move_l_example", anonymous=False)
+ur_script = rospy.Publisher('/ur_hardware_interface/script_command', String, queue_size=10)
+ur_con = UR_Controller()
+time.sleep(2)
+print("System Started")
+
+#---------------Main Code---------------:
+
+## Move using lib and pose
+my_pos = ur_con.get_pose()
+my_pos.position.z += 0.15
+command = ur_con.generate_move_l(my_pos)
+ur_script.publish(command)
+
+
+
